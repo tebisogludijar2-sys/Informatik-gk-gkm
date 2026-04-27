@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RoboCup Rescue Line 2026 – einfacher Parkour Generator</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <h1>Einfacher Parkour-Generator (RCL 2026)</h1>
+        <p>
+          Generiert einen möglichst machbaren Rescue Line Parkour auf Basis zentraler
+          RoboCupJunior Rescue Line 2026 Feldregeln.
+        </p>
+      </header>
+
+      <section class="controls">
+        <button id="generateBtn" type="button">Parkour neu generieren</button>
+      </section>
+
+      <section class="layout" aria-live="polite">
+        <div class="canvas-wrap">
+          <canvas id="courseCanvas" width="1400" height="420"></canvas>
+        </div>
+
+        <aside class="panel">
+          <h2>Zusammenfassung</h2>
+          <ul id="summaryList"></ul>
+
+          <h2>Tile-Sequenz</h2>
+          <ol id="tileList"></ol>
+
+          <h2>Regelbasis (Auszug)</h2>
+          <ul class="rules">
+            <li>Tilegröße: 30 × 30 cm</li>
+            <li>Mindestens 8 Wettbewerbs-Tiles (ohne Start/Goal)</li>
+            <li>Linie: schwarz, 1–2 cm breit</li>
+            <li>Gaps: max. 20 cm Länge</li>
+            <li>Rampen: max. 25°</li>
+            <li>Seesaw: &lt; 20°</li>
+            <li>Evacuation Zone: 120 × 90 cm mit 2 lebenden + 1 totem Opfer</li>
+            <li>Schwierigkeitsfokus: machbar, wenige kombinierte Hazards</li>
+          </ul>
+        </aside>
+      </section>
+    </main>
+
+    <script src="./script.js"></script>
+  </body>
+</html>

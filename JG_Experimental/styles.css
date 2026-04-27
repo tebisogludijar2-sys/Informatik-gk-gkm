@@ -1,0 +1,112 @@
+:root {
+  color-scheme: light;
+  --bg: #f6f8fb;
+  --panel: #ffffff;
+  --border: #d9e0ea;
+  --text: #1f2937;
+  --muted: #5b6677;
+  --accent: #1259c3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  padding: 1rem;
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+p {
+  margin: 0.4rem 0 1rem;
+  color: var(--muted);
+}
+
+.controls {
+  margin-bottom: 0.75rem;
+}
+
+button {
+  border: none;
+  border-radius: 0.55rem;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  padding: 0.65rem 1rem;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.08);
+}
+
+.layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr minmax(320px, 420px);
+  align-items: start;
+}
+
+.canvas-wrap,
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+.canvas-wrap {
+  padding: 0.75rem;
+  overflow: auto;
+}
+
+#courseCanvas {
+  display: block;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+.panel {
+  padding: 1rem;
+}
+
+.panel h2 {
+  margin: 0.6rem 0 0.45rem;
+  font-size: 1rem;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+#summaryList,
+#tileList {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.rules li {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+@media (max-width: 1200px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
