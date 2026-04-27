@@ -1,0 +1,382 @@
+const TILE_SIZE_CM = 30;
+const MIN_COMPETITION_TILES = 8;
+const MAX_ADDITIONAL_TILES = 2;
+const MIN_GAP_CM = 12;
+const MAX_GAP_CM = 18;
+const CANVAS_BASE_WIDTH = 1400;
+const CANVAS_HEIGHT = 420;
+const START_X = 20;
+const TILE_Y = 55;
+const TILE_STEP = 90;
+const TILE_DRAW_SIZE = 80;
+const EVACUATION_ZONE_WIDTH = 260;
+const RIGHT_PADDING = 30;
+const EVACUATION_ZONE_SIZE_CM_VALUES = { width: 120, height: 90 };
+const EVACUATION_ZONE_SIZE_LABEL = `${EVACUATION_ZONE_SIZE_CM_VALUES.width} x ${EVACUATION_ZONE_SIZE_CM_VALUES.height} cm`;
+const LIVE_VICTIMS = 2;
+const DEAD_VICTIMS = 1;
+const SEESAW_MAX_DEGREES = 20;
+const GAP_NOTE_TEXT = `Gap-Länge im Generator: ${MIN_GAP_CM}–${MAX_GAP_CM} cm`;
+
+const canvas = document.getElementById("courseCanvas");
+const ctx = canvas.getContext("2d");
+const summaryList = document.getElementById("summaryList");
+const tileList = document.getElementById("tileList");
+const generateBtn = document.getElementById("generateBtn");
+
+const HAZARD_STYLES = {
+  line: { color: "#ffffff", label: "Normale Linie" },
+  gap: { color: "#ffe3e3", label: "Gap (≤20 cm)" },
+  speed_bump: { color: "#fff7cc", label: "Speed Bump" },
+  intersection: { color: "#e6f7ff", label: "Intersection" },
+  obstacle: { color: "#ffe9d6", label: "Obstacle" },
+  seesaw: { color: "#f0e8ff", label: `Seesaw (< ${SEESAW_MAX_DEGREES}°)` },
+  ramp_up: { color: "#e6ffef", label: "Ramp Up" },
+  ramp_down: { color: "#e6ffef", label: "Ramp Down" },
+};
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function sample(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function pickFreeIndex(candidates, blocked) {
+  const valid = candidates.filter((i) => !blocked.has(i));
+  if (!valid.length) return null;
+  return sample(valid);
+}
+
+function setTileType(tiles, tileNumber, type, note = "") {
+  const idx = tileNumber - 1;
+  if (idx < 0 || idx >= tiles.length) return;
+  tiles[idx].type = type;
+  if (note) tiles[idx].note = note;
+}
+
+const SCORING_TILE_TYPES = new Set(Object.keys(HAZARD_STYLES).filter((key) => key !== "line"));
+
+function generateCourse() {
+  const mainTileCount = randomInt(MIN_COMPETITION_TILES, MIN_COMPETITION_TILES + MAX_ADDITIONAL_TILES);
+  const tiles = Array.from({ length: mainTileCount }, (_, i) => ({
+    idx: i + 1,
+    type: "line",
+    note: "",
+  }));
+
+  const blocked = new Set([1, mainTileCount]);
+  const candidates = Array.from({ length: mainTileCount - 2 }, (_, i) => i + 2);
+
+  // Mindestens ein leichtes Scoring-Element
+  const firstEasy = pickFreeIndex(candidates, blocked);
+  if (firstEasy !== null) {
+    const easyType = Math.random() < 0.5 ? "gap" : "speed_bump";
+    tiles[firstEasy - 1].type = easyType;
+    tiles[firstEasy - 1].note = easyType === "gap" ? GAP_NOTE_TEXT : "Niedrige Bodenwelle";
+    blocked.add(firstEasy);
+  }
+
+  // Optional zweite leichte Schwierigkeit
+  if (Math.random() < 0.55) {
+    const secondEasy = pickFreeIndex(candidates, blocked);
+    if (secondEasy !== null) {
+      tiles[secondEasy - 1].type = Math.random() < 0.5 ? "gap" : "speed_bump";
+      blocked.add(secondEasy);
+    }
+  }
+
+  // Optional Intersection
+  if (Math.random() < 0.45) {
+    const ix = pickFreeIndex(candidates, blocked);
+    if (ix !== null) {
+      tiles[ix - 1].type = "intersection";
+      tiles[ix - 1].note = "Einfaches T-Stück, grüne Marker legen die Richtung fest";
+      blocked.add(ix);
+    }
+  }
+
+  // Optional Rampen-Tripel: up - line - down (kein Peak-Fehler)
+  if (Math.random() < 0.45) {
+    const startCandidates = [];
+    for (let i = 2; i <= mainTileCount - 3; i++) {
+      if (!blocked.has(i) && !blocked.has(i + 1) && !blocked.has(i + 2)) {
+        startCandidates.push(i);
+      }
+    }
+    if (startCandidates.length) {
+      const start = sample(startCandidates);
+      const rampUpTile = start;
+      const bridgeTile = start + 1;
+      const rampDownTile = start + 2;
+      setTileType(tiles, rampUpTile, "ramp_up");
+      setTileType(tiles, bridgeTile, "line", "Zwischentile für sichere Rampenführung");
+      setTileType(tiles, rampDownTile, "ramp_down");
+      blocked.add(rampUpTile);
+      blocked.add(bridgeTile);
+      blocked.add(rampDownTile);
+    }
+  }
+
+  // Optional einzelnes Obstacle (sparsam für Machbarkeit)
+  if (Math.random() < 0.35) {
+    const ox = pickFreeIndex(candidates, blocked);
+    if (ox !== null) {
+      tiles[ox - 1].type = "obstacle";
+      tiles[ox - 1].note = "Einzelnes, klar umfahrbares Hindernis";
+      blocked.add(ox);
+    }
+  }
+
+  // Sehr selten Seesaw
+  if (Math.random() < 0.2) {
+    const sx = pickFreeIndex(candidates, blocked);
+    if (sx !== null) {
+      tiles[sx - 1].type = "seesaw";
+      tiles[sx - 1].note = "Geradlinige Wippe mit geringer Neigung";
+      blocked.add(sx);
+    }
+  }
+
+  // Checkpoints nur auf nicht-scoring Tiles (vereinfachte, machbare Verteilung)
+  const checkpoints = [1];
+  for (let i = 3; i <= mainTileCount - 1; i += 3) {
+    if (!SCORING_TILE_TYPES.has(tiles[i - 1].type)) checkpoints.push(i);
+  }
+
+  const hazardCount = tiles.filter((t) => SCORING_TILE_TYPES.has(t.type)).length;
+
+  return {
+    tiles,
+    checkpoints,
+    evacuationZone: {
+      size: EVACUATION_ZONE_SIZE_LABEL,
+      victims: { live: LIVE_VICTIMS, dead: DEAD_VICTIMS },
+      entryStrip: "Reflektierend silber (25 x 250 mm)",
+      exitStrip: "Schwarz (25 x 250 mm)",
+    },
+    postEvacuationTiles: 2,
+    difficulty: hazardCount <= 3 ? "niedrig" : "moderat",
+  };
+}
+
+function drawTile(x, y, tile, isCheckpoint = false) {
+  const style = HAZARD_STYLES[tile.type] || HAZARD_STYLES.line;
+
+  ctx.fillStyle = style.color;
+  ctx.fillRect(x, y, TILE_DRAW_SIZE, TILE_DRAW_SIZE);
+  ctx.strokeStyle = "#9aa6b2";
+  ctx.strokeRect(x, y, TILE_DRAW_SIZE, TILE_DRAW_SIZE);
+
+  // Linie
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(x + 10, y + 40);
+  ctx.lineTo(x + 70, y + 40);
+  ctx.stroke();
+
+  // Zusatzsymbolik
+  if (tile.type === "gap") {
+    ctx.clearRect(x + 34, y + 35, 12, 10);
+  }
+
+  if (tile.type === "intersection") {
+    ctx.beginPath();
+    ctx.moveTo(x + 40, y + 40);
+    ctx.lineTo(x + 40, y + 12);
+    ctx.stroke();
+    ctx.fillStyle = "#22c55e";
+    ctx.fillRect(x + 48, y + 26, 8, 8);
+  }
+
+  if (tile.type === "speed_bump") {
+    ctx.fillStyle = "#333";
+    ctx.fillRect(x + 28, y + 30, 24, 6);
+  }
+
+  if (tile.type === "obstacle") {
+    ctx.fillStyle = "#a16207";
+    ctx.fillRect(x + 30, y + 20, 20, 40);
+  }
+
+  if (tile.type === "seesaw") {
+    ctx.strokeStyle = "#6d28d9";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x + 18, y + 52);
+    ctx.lineTo(x + 62, y + 28);
+    ctx.stroke();
+  }
+
+  if (tile.type === "ramp_up" || tile.type === "ramp_down") {
+    ctx.fillStyle = "#059669";
+    const dir = tile.type === "ramp_up" ? -1 : 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 20, y + 60);
+    ctx.lineTo(x + 60, y + 60);
+    ctx.lineTo(x + 60, y + 60 + dir * -25);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  if (isCheckpoint) {
+    ctx.fillStyle = "#0ea5e9";
+    ctx.beginPath();
+    ctx.arc(x + 68, y + 12, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = "#1f2937";
+  ctx.font = "12px sans-serif";
+  ctx.fillText(`#${tile.idx}`, x + 6, y + 14);
+}
+
+function render(course) {
+  const preCoursePadding = START_X;
+  const preEvacuationWidth = TILE_STEP * (course.tiles.length + 1);
+  const evacuationSpacing = START_X;
+  const evacuationWidth = EVACUATION_ZONE_WIDTH;
+  const postEvacuationSpacing = START_X;
+  const postEvacuationWidth = TILE_STEP * course.postEvacuationTiles;
+  const goalWidth = TILE_DRAW_SIZE;
+  const finalPadding = RIGHT_PADDING;
+  const requiredWidth =
+    preCoursePadding +
+    preEvacuationWidth +
+    evacuationSpacing +
+    evacuationWidth +
+    postEvacuationSpacing +
+    postEvacuationWidth +
+    goalWidth +
+    finalPadding;
+  canvas.width = Math.max(CANVAS_BASE_WIDTH, requiredWidth);
+  canvas.height = CANVAS_HEIGHT;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const startX = START_X;
+  const tileY = TILE_Y;
+  const step = TILE_STEP;
+
+  ctx.font = "14px sans-serif";
+  ctx.fillStyle = "#111827";
+  ctx.fillText("Start", startX + 20, 30);
+  ctx.strokeRect(startX, tileY, TILE_DRAW_SIZE, TILE_DRAW_SIZE);
+
+  course.tiles.forEach((tile, i) => {
+    const x = startX + step * (i + 1);
+    drawTile(x, tileY, tile, course.checkpoints.includes(tile.idx));
+  });
+
+  const ezX = startX + step * (course.tiles.length + 1) + START_X;
+  const ezY = 35;
+  const ezW = 260;
+  const ezH = 180;
+
+  ctx.fillStyle = "#f8fafc";
+  ctx.fillRect(ezX, ezY, ezW, ezH);
+  ctx.strokeStyle = "#64748b";
+  ctx.strokeRect(ezX, ezY, ezW, ezH);
+  ctx.fillStyle = "#111827";
+  ctx.fillText(`Evacuation Zone (${EVACUATION_ZONE_SIZE_LABEL})`, ezX + 8, ezY + 18);
+
+  // Eingang/Ausgang
+  ctx.fillStyle = "#c0c0c0";
+  ctx.fillRect(ezX - 10, ezY + ezH / 2 - 4, 10, 8);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(ezX + ezW, ezY + ezH / 2 - 4, 10, 8);
+
+  // Evacuation points (Dreiecke)
+  ctx.fillStyle = "#22c55e";
+  ctx.beginPath();
+  ctx.moveTo(ezX + ezW - 14, ezY + 14);
+  ctx.lineTo(ezX + ezW - 70, ezY + 14);
+  ctx.lineTo(ezX + ezW - 14, ezY + 70);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "#ef4444";
+  ctx.beginPath();
+  ctx.moveTo(ezX + 14, ezY + ezH - 14);
+  ctx.lineTo(ezX + 70, ezY + ezH - 14);
+  ctx.lineTo(ezX + 14, ezY + ezH - 70);
+  ctx.closePath();
+  ctx.fill();
+
+  // Opfer (2 live silber, 1 dead schwarz)
+  const victimPositions = [
+    ...Array.from({ length: LIVE_VICTIMS }, (_, idx) => [ezX + 80 + idx * 70, ezY + 80 + idx * 40, "silver"]),
+    ...Array.from({ length: DEAD_VICTIMS }, (_, idx) => [ezX + 190 + idx * 15, ezY + 70 + idx * 20, "black"]),
+  ];
+  for (const [vx, vy, color] of victimPositions) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(vx, vy, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#111";
+    ctx.stroke();
+  }
+
+  // Nach EZ zur Goal Tile
+  const exitStartX = ezX + ezW + 20;
+  for (let i = 0; i < course.postEvacuationTiles; i++) {
+    const x = exitStartX + i * step;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(x, tileY, TILE_DRAW_SIZE, TILE_DRAW_SIZE);
+    ctx.strokeStyle = "#9aa6b2";
+    ctx.strokeRect(x, tileY, TILE_DRAW_SIZE, TILE_DRAW_SIZE);
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(x + 10, tileY + 40);
+    ctx.lineTo(x + 70, tileY + 40);
+    ctx.stroke();
+  }
+
+  const goalX = exitStartX + step * course.postEvacuationTiles;
+  ctx.strokeStyle = "#9aa6b2";
+  ctx.strokeRect(goalX, tileY, TILE_DRAW_SIZE, TILE_DRAW_SIZE);
+  ctx.fillStyle = "#dc2626";
+  ctx.fillRect(goalX + 28, tileY + 8, 24, 64);
+  ctx.fillStyle = "#111827";
+  ctx.fillText("Goal", goalX + 20, 30);
+
+  renderLists(course);
+}
+
+function renderLists(course) {
+  const hazardCount = course.tiles.filter((tile) => tile.type !== "line").length;
+
+  summaryList.innerHTML = "";
+  const summaryItems = [
+    `Tilegröße: ${TILE_SIZE_CM} x ${TILE_SIZE_CM} cm`,
+    `Wettbewerbs-Tiles (ohne Start/Goal): ${course.tiles.length}`,
+    `Checkpoints: ${course.checkpoints.join(", ")}`,
+    `Hazards gesamt: ${hazardCount}`,
+    `Difficulty: ${course.difficulty}`,
+    `Evacuation Zone: ${course.evacuationZone.size}, Opfer: ${course.evacuationZone.victims.live} lebend + ${course.evacuationZone.victims.dead} tot`,
+  ];
+
+  for (const item of summaryItems) {
+    const li = document.createElement("li");
+    li.textContent = item;
+    summaryList.appendChild(li);
+  }
+
+  tileList.innerHTML = "";
+  for (const tile of course.tiles) {
+    const li = document.createElement("li");
+    const style = HAZARD_STYLES[tile.type] || HAZARD_STYLES.line;
+    li.textContent = `Tile ${tile.idx}: ${style.label}${tile.note ? ` (${tile.note})` : ""}`;
+    tileList.appendChild(li);
+  }
+}
+
+function generateAndRender() {
+  const course = generateCourse();
+  render(course);
+}
+
+generateBtn.addEventListener("click", generateAndRender);
+generateAndRender();
