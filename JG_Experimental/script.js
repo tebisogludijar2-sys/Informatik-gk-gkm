@@ -3,6 +3,14 @@ const MIN_COMPETITION_TILES = 8;
 const MAX_ADDITIONAL_TILES = 2;
 const MIN_GAP_CM = 12;
 const MAX_GAP_CM = 18;
+const CANVAS_BASE_WIDTH = 1400;
+const CANVAS_HEIGHT = 420;
+const START_X = 20;
+const TILE_Y = 55;
+const TILE_STEP = 90;
+const TILE_DRAW_SIZE = 80;
+const EVACUATION_ZONE_WIDTH = 260;
+const RIGHT_PADDING = 30;
 
 const canvas = document.getElementById("courseCanvas");
 const ctx = canvas.getContext("2d");
@@ -75,7 +83,7 @@ function generateCourse() {
   }
 
   // Optional Rampen-Tripel: up - line - down (kein Peak-Fehler)
-  if (Math.random() < 0.45 && mainTileCount >= 9) {
+  if (Math.random() < 0.45 && mainTileCount >= 10) {
     const startCandidates = [];
     for (let i = 2; i <= mainTileCount - 3; i++) {
       if (!blocked.has(i) && !blocked.has(i + 1) && !blocked.has(i + 2)) {
@@ -141,9 +149,9 @@ function drawTile(x, y, tile, isCheckpoint = false) {
   const style = HAZARD_STYLES[tile.type] || HAZARD_STYLES.line;
 
   ctx.fillStyle = style.color;
-  ctx.fillRect(x, y, 80, 80);
+  ctx.fillRect(x, y, TILE_DRAW_SIZE, TILE_DRAW_SIZE);
   ctx.strokeStyle = "#9aa6b2";
-  ctx.strokeRect(x, y, 80, 80);
+  ctx.strokeRect(x, y, TILE_DRAW_SIZE, TILE_DRAW_SIZE);
 
   // Linie
   ctx.strokeStyle = "#111";
@@ -210,26 +218,34 @@ function drawTile(x, y, tile, isCheckpoint = false) {
 }
 
 function render(course) {
-  const requiredWidth = 20 + 90 * (course.tiles.length + 1) + 20 + 260 + 20 + 90 * course.postEvacuationTiles + 80 + 30;
-  canvas.width = Math.max(1400, requiredWidth);
-  canvas.height = 420;
+  const requiredWidth =
+    START_X +
+    TILE_STEP * (course.tiles.length + 1) +
+    START_X +
+    EVACUATION_ZONE_WIDTH +
+    START_X +
+    TILE_STEP * course.postEvacuationTiles +
+    TILE_DRAW_SIZE +
+    RIGHT_PADDING;
+  canvas.width = Math.max(CANVAS_BASE_WIDTH, requiredWidth);
+  canvas.height = CANVAS_HEIGHT;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const startX = 20;
-  const tileY = 55;
-  const step = 90;
+  const startX = START_X;
+  const tileY = TILE_Y;
+  const step = TILE_STEP;
 
   ctx.font = "14px sans-serif";
   ctx.fillStyle = "#111827";
   ctx.fillText("Start", startX + 20, 30);
-  ctx.strokeRect(startX, tileY, 80, 80);
+  ctx.strokeRect(startX, tileY, TILE_DRAW_SIZE, TILE_DRAW_SIZE);
 
   course.tiles.forEach((tile, i) => {
     const x = startX + step * (i + 1);
     drawTile(x, tileY, tile, course.checkpoints.includes(tile.idx));
   });
 
-  const ezX = startX + step * (course.tiles.length + 1) + 20;
+  const ezX = startX + step * (course.tiles.length + 1) + START_X;
   const ezY = 35;
   const ezW = 260;
   const ezH = 180;
@@ -284,9 +300,9 @@ function render(course) {
   for (let i = 0; i < course.postEvacuationTiles; i++) {
     const x = exitStartX + i * step;
     ctx.fillStyle = "#fff";
-    ctx.fillRect(x, tileY, 80, 80);
+    ctx.fillRect(x, tileY, TILE_DRAW_SIZE, TILE_DRAW_SIZE);
     ctx.strokeStyle = "#9aa6b2";
-    ctx.strokeRect(x, tileY, 80, 80);
+    ctx.strokeRect(x, tileY, TILE_DRAW_SIZE, TILE_DRAW_SIZE);
     ctx.strokeStyle = "#111";
     ctx.lineWidth = 6;
     ctx.beginPath();
@@ -297,7 +313,7 @@ function render(course) {
 
   const goalX = exitStartX + step * course.postEvacuationTiles;
   ctx.strokeStyle = "#9aa6b2";
-  ctx.strokeRect(goalX, tileY, 80, 80);
+  ctx.strokeRect(goalX, tileY, TILE_DRAW_SIZE, TILE_DRAW_SIZE);
   ctx.fillStyle = "#dc2626";
   ctx.fillRect(goalX + 28, tileY + 8, 24, 64);
   ctx.fillStyle = "#111827";
@@ -307,17 +323,14 @@ function render(course) {
 }
 
 function renderLists(course) {
-  const counts = course.tiles.reduce((acc, t) => {
-    acc[t.type] = (acc[t.type] || 0) + 1;
-    return acc;
-  }, {});
+  const hazardCount = course.tiles.filter((tile) => tile.type !== "line").length;
 
   summaryList.innerHTML = "";
   const summaryItems = [
     `Tilegröße: ${TILE_SIZE_CM} x ${TILE_SIZE_CM} cm`,
     `Wettbewerbs-Tiles (ohne Start/Goal): ${course.tiles.length}`,
     `Checkpoints: ${course.checkpoints.join(", ")}`,
-    `Hazards gesamt: ${(course.tiles.length - (counts.line || 0))}`,
+    `Hazards gesamt: ${hazardCount}`,
     `Difficulty: ${course.difficulty}`,
     `Evacuation Zone: ${course.evacuationZone.size}, Opfer: 2 lebend + 1 tot`,
   ];
