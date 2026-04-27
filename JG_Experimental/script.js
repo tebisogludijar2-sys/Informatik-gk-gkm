@@ -1,5 +1,8 @@
 const TILE_SIZE_CM = 30;
 const MIN_COMPETITION_TILES = 8;
+const MAX_ADDITIONAL_TILES = 2;
+const MIN_GAP_CM = 12;
+const MAX_GAP_CM = 18;
 
 const canvas = document.getElementById("courseCanvas");
 const ctx = canvas.getContext("2d");
@@ -33,7 +36,7 @@ function pickFreeIndex(candidates, blocked) {
 }
 
 function generateCourse() {
-  const mainTileCount = randomInt(MIN_COMPETITION_TILES, MIN_COMPETITION_TILES + 2);
+  const mainTileCount = randomInt(MIN_COMPETITION_TILES, MIN_COMPETITION_TILES + MAX_ADDITIONAL_TILES);
   const tiles = Array.from({ length: mainTileCount }, (_, i) => ({
     idx: i + 1,
     type: "line",
@@ -48,7 +51,7 @@ function generateCourse() {
   if (firstEasy !== null) {
     const easyType = Math.random() < 0.5 ? "gap" : "speed_bump";
     tiles[firstEasy - 1].type = easyType;
-    tiles[firstEasy - 1].note = easyType === "gap" ? "Gap-Länge im Generator: 12–18 cm" : "Niedrige Bodenwelle";
+    tiles[firstEasy - 1].note = easyType === "gap" ? `Gap-Länge im Generator: ${MIN_GAP_CM}–${MAX_GAP_CM} cm` : "Niedrige Bodenwelle";
     blocked.add(firstEasy);
   }
 
