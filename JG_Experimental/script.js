@@ -11,6 +11,11 @@ const TILE_STEP = 90;
 const TILE_DRAW_SIZE = 80;
 const EVACUATION_ZONE_WIDTH = 260;
 const RIGHT_PADDING = 30;
+const EVACUATION_ZONE_SIZE_CM = { width: 120, height: 90 };
+const EVACUATION_ZONE_SIZE_LABEL = `${EVACUATION_ZONE_SIZE_CM.width} x ${EVACUATION_ZONE_SIZE_CM.height} cm`;
+const LIVE_VICTIMS = 2;
+const DEAD_VICTIMS = 1;
+const SEESAW_MAX_DEGREES = 20;
 
 const canvas = document.getElementById("courseCanvas");
 const ctx = canvas.getContext("2d");
@@ -24,7 +29,7 @@ const HAZARD_STYLES = {
   speed_bump: { color: "#fff7cc", label: "Speed Bump" },
   intersection: { color: "#e6f7ff", label: "Intersection" },
   obstacle: { color: "#ffe9d6", label: "Obstacle" },
-  seesaw: { color: "#f0e8ff", label: "Seesaw" },
+  seesaw: { color: "#f0e8ff", label: `Seesaw (< ${SEESAW_MAX_DEGREES}°)` },
   ramp_up: { color: "#e6ffef", label: "Ramp Up" },
   ramp_down: { color: "#e6ffef", label: "Ramp Down" },
 };
@@ -144,8 +149,8 @@ function generateCourse() {
     tiles,
     checkpoints,
     evacuationZone: {
-      size: "120 x 90 cm",
-      victims: { live: 2, dead: 1 },
+      size: EVACUATION_ZONE_SIZE_LABEL,
+      victims: { live: LIVE_VICTIMS, dead: DEAD_VICTIMS },
       entryStrip: "Reflektierend silber (25 x 250 mm)",
       exitStrip: "Schwarz (25 x 250 mm)",
     },
@@ -264,7 +269,7 @@ function render(course) {
   ctx.strokeStyle = "#64748b";
   ctx.strokeRect(ezX, ezY, ezW, ezH);
   ctx.fillStyle = "#111827";
-  ctx.fillText("Evacuation Zone (120 x 90 cm)", ezX + 8, ezY + 18);
+  ctx.fillText(`Evacuation Zone (${EVACUATION_ZONE_SIZE_LABEL})`, ezX + 8, ezY + 18);
 
   // Eingang/Ausgang
   ctx.fillStyle = "#c0c0c0";
@@ -291,9 +296,8 @@ function render(course) {
 
   // Opfer (2 live silber, 1 dead schwarz)
   const victimPositions = [
-    [ezX + 80, ezY + 80, "silver"],
-    [ezX + 150, ezY + 120, "silver"],
-    [ezX + 190, ezY + 70, "black"],
+    ...Array.from({ length: LIVE_VICTIMS }, (_, idx) => [ezX + 80 + idx * 70, ezY + 80 + idx * 40, "silver"]),
+    ...Array.from({ length: DEAD_VICTIMS }, (_, idx) => [ezX + 190 + idx * 15, ezY + 70 + idx * 20, "black"]),
   ];
   for (const [vx, vy, color] of victimPositions) {
     ctx.fillStyle = color;
@@ -341,7 +345,7 @@ function renderLists(course) {
     `Checkpoints: ${course.checkpoints.join(", ")}`,
     `Hazards gesamt: ${hazardCount}`,
     `Difficulty: ${course.difficulty}`,
-    `Evacuation Zone: ${course.evacuationZone.size}, Opfer: 2 lebend + 1 tot`,
+    `Evacuation Zone: ${course.evacuationZone.size}, Opfer: ${course.evacuationZone.victims.live} lebend + ${course.evacuationZone.victims.dead} tot`,
   ];
 
   for (const item of summaryItems) {
