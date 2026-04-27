@@ -43,6 +43,13 @@ function pickFreeIndex(candidates, blocked) {
   return sample(valid);
 }
 
+function setTileType(tiles, tileNumber, type, note = "") {
+  const idx = tileNumber - 1;
+  if (idx < 0 || idx >= tiles.length) return;
+  tiles[idx].type = type;
+  if (note) tiles[idx].note = note;
+}
+
 function generateCourse() {
   const mainTileCount = randomInt(MIN_COMPETITION_TILES, MIN_COMPETITION_TILES + MAX_ADDITIONAL_TILES);
   const tiles = Array.from({ length: mainTileCount }, (_, i) => ({
@@ -83,7 +90,7 @@ function generateCourse() {
   }
 
   // Optional Rampen-Tripel: up - line - down (kein Peak-Fehler)
-  if (Math.random() < 0.45 && mainTileCount >= 10) {
+  if (Math.random() < 0.45) {
     const startCandidates = [];
     for (let i = 2; i <= mainTileCount - 3; i++) {
       if (!blocked.has(i) && !blocked.has(i + 1) && !blocked.has(i + 2)) {
@@ -92,13 +99,15 @@ function generateCourse() {
     }
     if (startCandidates.length) {
       const start = sample(startCandidates);
-      tiles[start - 1].type = "ramp_up";
-      tiles[start].type = "line";
-      tiles[start + 1].type = "ramp_down";
-      tiles[start].note = "Zwischentile für sichere Rampenführung";
-      blocked.add(start);
-      blocked.add(start + 1);
-      blocked.add(start + 2);
+      const rampUpTile = start;
+      const bridgeTile = start + 1;
+      const rampDownTile = start + 2;
+      setTileType(tiles, rampUpTile, "ramp_up");
+      setTileType(tiles, bridgeTile, "line", "Zwischentile für sichere Rampenführung");
+      setTileType(tiles, rampDownTile, "ramp_down");
+      blocked.add(rampUpTile);
+      blocked.add(bridgeTile);
+      blocked.add(rampDownTile);
     }
   }
 
