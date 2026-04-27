@@ -11,11 +11,12 @@ const TILE_STEP = 90;
 const TILE_DRAW_SIZE = 80;
 const EVACUATION_ZONE_WIDTH = 260;
 const RIGHT_PADDING = 30;
-const EVACUATION_ZONE_SIZE_CM = { width: 120, height: 90 };
-const EVACUATION_ZONE_SIZE_LABEL = `${EVACUATION_ZONE_SIZE_CM.width} x ${EVACUATION_ZONE_SIZE_CM.height} cm`;
+const EVACUATION_ZONE_SIZE_CM_VALUES = { width: 120, height: 90 };
+const EVACUATION_ZONE_SIZE_LABEL = `${EVACUATION_ZONE_SIZE_CM_VALUES.width} x ${EVACUATION_ZONE_SIZE_CM_VALUES.height} cm`;
 const LIVE_VICTIMS = 2;
 const DEAD_VICTIMS = 1;
 const SEESAW_MAX_DEGREES = 20;
+const GAP_NOTE_TEXT = `Gap-Länge im Generator: ${MIN_GAP_CM}–${MAX_GAP_CM} cm`;
 
 const canvas = document.getElementById("courseCanvas");
 const ctx = canvas.getContext("2d");
@@ -55,6 +56,8 @@ function setTileType(tiles, tileNumber, type, note = "") {
   if (note) tiles[idx].note = note;
 }
 
+const SCORING_TILE_TYPES = new Set(Object.keys(HAZARD_STYLES).filter((key) => key !== "line"));
+
 function generateCourse() {
   const mainTileCount = randomInt(MIN_COMPETITION_TILES, MIN_COMPETITION_TILES + MAX_ADDITIONAL_TILES);
   const tiles = Array.from({ length: mainTileCount }, (_, i) => ({
@@ -71,7 +74,7 @@ function generateCourse() {
   if (firstEasy !== null) {
     const easyType = Math.random() < 0.5 ? "gap" : "speed_bump";
     tiles[firstEasy - 1].type = easyType;
-    tiles[firstEasy - 1].note = easyType === "gap" ? `Gap-Länge im Generator: ${MIN_GAP_CM}–${MAX_GAP_CM} cm` : "Niedrige Bodenwelle";
+    tiles[firstEasy - 1].note = easyType === "gap" ? GAP_NOTE_TEXT : "Niedrige Bodenwelle";
     blocked.add(firstEasy);
   }
 
@@ -137,13 +140,12 @@ function generateCourse() {
   }
 
   // Checkpoints nur auf nicht-scoring Tiles (vereinfachte, machbare Verteilung)
-  const scoringTypes = new Set(["gap", "speed_bump", "intersection", "obstacle", "seesaw", "ramp_up", "ramp_down"]);
   const checkpoints = [1];
   for (let i = 3; i <= mainTileCount - 1; i += 3) {
-    if (!scoringTypes.has(tiles[i - 1].type)) checkpoints.push(i);
+    if (!SCORING_TILE_TYPES.has(tiles[i - 1].type)) checkpoints.push(i);
   }
 
-  const hazardCount = tiles.filter((t) => scoringTypes.has(t.type)).length;
+  const hazardCount = tiles.filter((t) => SCORING_TILE_TYPES.has(t.type)).length;
 
   return {
     tiles,
@@ -232,15 +234,23 @@ function drawTile(x, y, tile, isCheckpoint = false) {
 }
 
 function render(course) {
+  const preCoursePadding = START_X;
+  const preEvacuationWidth = TILE_STEP * (course.tiles.length + 1);
+  const evacuationSpacing = START_X;
+  const evacuationWidth = EVACUATION_ZONE_WIDTH;
+  const postEvacuationSpacing = START_X;
+  const postEvacuationWidth = TILE_STEP * course.postEvacuationTiles;
+  const goalWidth = TILE_DRAW_SIZE;
+  const finalPadding = RIGHT_PADDING;
   const requiredWidth =
-    START_X +
-    TILE_STEP * (course.tiles.length + 1) +
-    START_X +
-    EVACUATION_ZONE_WIDTH +
-    START_X +
-    TILE_STEP * course.postEvacuationTiles +
-    TILE_DRAW_SIZE +
-    RIGHT_PADDING;
+    preCoursePadding +
+    preEvacuationWidth +
+    evacuationSpacing +
+    evacuationWidth +
+    postEvacuationSpacing +
+    postEvacuationWidth +
+    goalWidth +
+    finalPadding;
   canvas.width = Math.max(CANVAS_BASE_WIDTH, requiredWidth);
   canvas.height = CANVAS_HEIGHT;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
